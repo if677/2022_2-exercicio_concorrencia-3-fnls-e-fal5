@@ -34,18 +34,20 @@ public class Player {
      * The AudioDevice where audio samples are written to.
      */
     private AudioDevice device;
+    private PlayerWindow window;
+    private String[][] musics = {};
 
     private int currentFrame = 0;
 
-    private final ActionListener buttonListenerPlayNow = ;
-    private final ActionListener buttonListenerRemove = ;
-    private final ActionListener buttonListenerAddSong = ;
-    private final ActionListener buttonListenerPlayPause = ;
-    private final ActionListener buttonListenerStop = ;
-    private final ActionListener buttonListenerNext = ;
-    private final ActionListener buttonListenerPrevious = ;
-    private final ActionListener buttonListenerShuffle = ;
-    private final ActionListener buttonListenerLoop = ;
+    private final ActionListener buttonListenerPlayNow = e -> {};
+    private final ActionListener buttonListenerRemove = e -> {};
+    private final ActionListener buttonListenerAddSong = e -> {};
+    private final ActionListener buttonListenerPlayPause = e -> {};
+    private final ActionListener buttonListenerStop = e -> {};
+    private final ActionListener buttonListenerNext = e -> {};
+    private final ActionListener buttonListenerPrevious = e -> {};
+    private final ActionListener buttonListenerShuffle = e -> {};
+    private final ActionListener buttonListenerLoop = e -> {};
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         @Override
         public void mouseReleased(MouseEvent e) {
@@ -62,8 +64,8 @@ public class Player {
 
     public Player() {
         EventQueue.invokeLater(() -> window = new PlayerWindow(
-                TITULO_DA_JANELA,
-                FILA_COMO_ARRAY_BIDIMENSIONAL,
+                "Apoo Player",
+                musics,
                 buttonListenerPlayNow,
                 buttonListenerRemove,
                 buttonListenerAddSong,
