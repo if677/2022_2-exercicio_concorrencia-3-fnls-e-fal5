@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,13 +36,31 @@ public class Player {
      */
     private AudioDevice device;
     private PlayerWindow window;
-    private String[][] musics = {};
+    private String[][] musics = new String[0][];
+
+    private ArrayList<Song> playlist = new ArrayList<Song>();
 
     private int currentFrame = 0;
 
     private final ActionListener buttonListenerPlayNow = e -> {};
     private final ActionListener buttonListenerRemove = e -> {};
-    private final ActionListener buttonListenerAddSong = e -> {};
+    private final ActionListener buttonListenerAddSong = e -> {
+        try {
+            Song music = this.window.openFileChooser();
+            playlist.add(music);
+            String[] musicInfo = music.getDisplayInfo();
+            int size = musics.length;
+            musics = Arrays.copyOf(musics,size + 1);
+            musics[size] = musicInfo;
+            this.window.setQueueList(musics);
+        }
+        catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
+            throw new RuntimeException(ex);
+        }
+
+
+
+    };
     private final ActionListener buttonListenerPlayPause = e -> {};
     private final ActionListener buttonListenerStop = e -> {};
     private final ActionListener buttonListenerNext = e -> {};
