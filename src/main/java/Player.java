@@ -38,12 +38,24 @@ public class Player {
     private PlayerWindow window;
     private String[][] musics = new String[0][];
 
+    private String[][] removeMusic(String[][] list, int idx){
+        String[][] newList = new String[list.length - 1][];
+        System.arraycopy(list, 0, newList, 0, idx);
+        System.arraycopy(list, idx + 1, newList, idx, list.length - idx - 1);
+        return newList;
+    }
+
     private ArrayList<Song> playlist = new ArrayList<Song>();
 
     private int currentFrame = 0;
 
     private final ActionListener buttonListenerPlayNow = e -> {};
-    private final ActionListener buttonListenerRemove = e -> {};
+    private final ActionListener buttonListenerRemove = e -> {
+        int index = window.getIdx();
+        playlist.remove(index);
+        musics = removeMusic(musics, index);
+        this.window.setQueueList(musics);
+    };
     private final ActionListener buttonListenerAddSong = e -> {
         try {
             Song music = this.window.openFileChooser();

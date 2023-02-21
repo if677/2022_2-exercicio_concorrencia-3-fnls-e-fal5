@@ -322,6 +322,10 @@ public class PlayerWindow {
      * @param songAlbum  Song album.
      * @param songArtist Song artist.
      */
+
+    public int getIdx() {
+        return queueList.getSelectedRow();
+    }
     public void setPlayingSongInfo(String songTitle, String songAlbum, String songArtist) {
         miniPlayerSongInfo.setText(songTitle + "     |     " + songAlbum + "     |     " + songArtist);
         miniPlayerSongInfo.repaint();
