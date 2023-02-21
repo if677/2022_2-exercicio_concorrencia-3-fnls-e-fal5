@@ -76,7 +76,9 @@ public class Player {
                     window.setEnabledPlayPauseButton(true);
                     window.setEnabledStopButton(true);
 
+                    // resetar o minplayer quando a musica acabar
                     if (!playNextFrame()) {
+                        window.resetMiniPlayer();
                         break;
                     }
                 } catch (JavaLayerException ex) {
@@ -86,7 +88,6 @@ public class Player {
         });
 
         playthread.start();
-
     };
 
     private final ActionListener buttonListenerRemove = e -> {
@@ -171,6 +172,7 @@ public class Player {
             SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
             device.write(output.getBuffer(), 0, output.getBufferLength());
             bitstream.closeFrame();
+            currentFrame++;
         }
         return true;
     }
