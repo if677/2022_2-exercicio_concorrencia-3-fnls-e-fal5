@@ -38,24 +38,64 @@ public class Player {
     private PlayerWindow window;
     private String[][] musics = new String[0][];
 
-    private String[][] removeMusic(String[][] list, int idx){
-        String[][] newList = new String[list.length - 1][];
-        System.arraycopy(list, 0, newList, 0, idx);
-        System.arraycopy(list, idx + 1, newList, idx, list.length - idx - 1);
-        return newList;
-    }
-
     private ArrayList<Song> playlist = new ArrayList<Song>();
 
     private int currentFrame = 0;
+    private int index;
+    private Song curr_song;
+    private Thread playthread;
 
-    private final ActionListener buttonListenerPlayNow = e -> {};
+    private final ActionListener buttonListenerPlayNow = e -> {
+        // setando o frame para o começo da musica
+        currentFrame = 0;
+
+        // selecionando a musica
+        index = window.getIdx();
+        curr_song = playlist.get(index);
+
+        // inicializar os objetos para reproduzir a musica
+        try {
+            this.device = FactoryRegistry.systemRegistry().createAudioDevice();
+            this.device.open(this.decoder = new Decoder());
+            this.bitstream = new Bitstream(curr_song.getBufferedInputStream());
+
+        } catch (JavaLayerException | FileNotFoundException ex) {
+            throw new RuntimeException(ex);
+        }
+
+        // exibir informações da musica atual
+        window.setPlayingSongInfo(curr_song.getTitle(), curr_song.getAlbum(), curr_song.getArtist());
+
+        // iniciar a thread e começar a tocar a musica
+        playthread = new Thread(() -> {
+
+            while(true) {
+                try {
+                    window.setTime((currentFrame * (int) curr_song.getMsPerFrame()), (int) curr_song.getMsLength());
+                    window.setPlayPauseButtonIcon(1);
+                    window.setEnabledPlayPauseButton(true);
+                    window.setEnabledStopButton(true);
+
+                    if (!playNextFrame()) {
+                        break;
+                    }
+                } catch (JavaLayerException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        });
+
+        playthread.start();
+
+    };
+
     private final ActionListener buttonListenerRemove = e -> {
         int index = window.getIdx();
         playlist.remove(index);
         musics = removeMusic(musics, index);
         this.window.setQueueList(musics);
     };
+
     private final ActionListener buttonListenerAddSong = e -> {
         try {
             Song music = this.window.openFileChooser();
@@ -73,8 +113,15 @@ public class Player {
 
 
     };
-    private final ActionListener buttonListenerPlayPause = e -> {};
-    private final ActionListener buttonListenerStop = e -> {};
+
+    private final ActionListener buttonListenerPlayPause = e -> {
+
+    };
+
+    private final ActionListener buttonListenerStop = e -> {
+
+    };
+
     private final ActionListener buttonListenerNext = e -> {};
     private final ActionListener buttonListenerPrevious = e -> {};
     private final ActionListener buttonListenerShuffle = e -> {};
@@ -153,6 +200,13 @@ public class Player {
             boolean condition = true;
             while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
         }
+    }
+
+    private String[][] removeMusic(String[][] list, int idx){
+        String[][] newList = new String[list.length - 1][];
+        System.arraycopy(list, 0, newList, 0, idx);
+        System.arraycopy(list, idx + 1, newList, idx, list.length - idx - 1);
+        return newList;
     }
     //</editor-fold>
 }
