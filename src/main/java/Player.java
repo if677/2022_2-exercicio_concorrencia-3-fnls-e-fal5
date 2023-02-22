@@ -49,6 +49,7 @@ public class Player {
     private final ActionListener buttonListenerPlayNow = e -> {
         // setando o frame para o começo da musica
         currentFrame = 0;
+        playPause = 1;
 
         // selecionando a musica
         index = window.getIdx();
@@ -115,14 +116,13 @@ public class Player {
         }
 
 
-
     };
-
     private final ActionListener buttonListenerPlayPause = e -> {
-        if(playPause == 1) playPause = 0;
+        if (playPause == 1) playPause = 0;
         else playPause = 1;
 
         window.setPlayPauseButtonIcon(playPause);
+
     };
 
     private final ActionListener buttonListenerStop = e -> {
