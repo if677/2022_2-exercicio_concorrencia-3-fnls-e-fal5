@@ -41,6 +41,7 @@ public class Player {
     private ArrayList<Song> playlist = new ArrayList<Song>();
 
     private int currentFrame = 0;
+    private int playPause = 1;
     private int index;
     private Song curr_song;
     private Thread playthread;
@@ -70,19 +71,21 @@ public class Player {
         playthread = new Thread(() -> {
 
             while(true) {
-                try {
-                    window.setTime((currentFrame * (int) curr_song.getMsPerFrame()), (int) curr_song.getMsLength());
-                    window.setPlayPauseButtonIcon(1);
-                    window.setEnabledPlayPauseButton(true);
-                    window.setEnabledStopButton(true);
+                if(playPause == 1){
+                    try {
+                        window.setTime((currentFrame * (int) curr_song.getMsPerFrame()), (int) curr_song.getMsLength());
+                        window.setPlayPauseButtonIcon(playPause);
+                        window.setEnabledPlayPauseButton(true);
+                        window.setEnabledStopButton(true);
 
-                    // resetar o minplayer quando a musica acabar
-                    if (!playNextFrame()) {
-                        window.resetMiniPlayer();
-                        break;
+                        // resetar o minplayer quando a musica acabar
+                        if (!playNextFrame()) {
+                            window.resetMiniPlayer();
+                            break;
+                        }
+                    } catch (JavaLayerException ex) {
+                        throw new RuntimeException(ex);
                     }
-                } catch (JavaLayerException ex) {
-                    throw new RuntimeException(ex);
                 }
             }
         });
@@ -116,7 +119,10 @@ public class Player {
     };
 
     private final ActionListener buttonListenerPlayPause = e -> {
+        if(playPause == 1) playPause = 0;
+        else playPause = 1;
 
+        window.setPlayPauseButtonIcon(playPause);
     };
 
     private final ActionListener buttonListenerStop = e -> {
