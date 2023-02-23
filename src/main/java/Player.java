@@ -111,23 +111,35 @@ public class Player {
     };
 
     private final ActionListener buttonListenerRemove = e -> {
+        // pega o index da música a ser removida
         int idx = window.getIdx();
+        // caso ele esteja tocando, para a reprodução e reseta a janela
         if(idx == index && isplaying) stopMusic(playthread, bitstream, device, window, isplaying);
-
-        if(idx < index) index--; // diminui o index da música tocando se uma música antes dela for removida
+        // diminui o index da música tocando se uma música antes dela for removida
+        if(idx < index) index--;
+        // remove a música da playlist
         playlist.remove(idx);
+        // remove a música da lista de músicas
         musics = removeMusic(musics, idx);
+        // atualiza a fila
         this.window.setQueueList(musics);
     };
 
     private final ActionListener buttonListenerAddSong = e -> {
         try {
+            // escolhe um arquivo mp3
             Song music = this.window.openFileChooser();
+            // adciona na playlist
             playlist.add(music);
+            // coleta as informações da música
             String[] musicInfo = music.getDisplayInfo();
+            // pega o tamanho da lista de músicas
             int size = musics.length;
+            // aumenta o tamanho da lista em 1
             musics = Arrays.copyOf(musics,size + 1);
+            // adciona a nova música na lista
             musics[size] = musicInfo;
+            // atualiza a fila
             this.window.setQueueList(musics);
         }
         catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
@@ -137,10 +149,10 @@ public class Player {
 
     };
     private final ActionListener buttonListenerPlayPause = e -> {
-        if (playPause == 1) playPause = 0;
-        else playPause = 1;
+        if (playPause == 1) playPause = 0; //caso o botão esteja habilitado e como pause, muda para play
+        else playPause = 1; //caso esteja como play, muda para pause
 
-        window.setPlayPauseButtonIcon(playPause);
+        window.setPlayPauseButtonIcon(playPause); // seta a mudança
 
     };
 
@@ -233,9 +245,13 @@ public class Player {
     }
 
     private String[][] removeMusic(String[][] list, int idx){
+        // cria um array com 1 espaço a menos
         String[][] newList = new String[list.length - 1][];
+        // copia os elementos até o do index a ser removido
         System.arraycopy(list, 0, newList, 0, idx);
+        // copia os elementos depois do index a ser removido
         System.arraycopy(list, idx + 1, newList, idx, list.length - idx - 1);
+        // retorna o array sem o elemento de index indicado
         return newList;
     }
 
