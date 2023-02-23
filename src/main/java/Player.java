@@ -48,6 +48,17 @@ public class Player {
     private boolean isplaying = false;
 
     private final ActionListener buttonListenerPlayNow = e -> {
+        // caso tenha mudado de musica antes de terminar e nao fechou o bitstream
+        if (bitstream != null) {
+            playthread.stop();
+            try {
+                bitstream.close();
+                device.close();
+            } catch (BitstreamException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
         // setando o frame para o começo da musica
         currentFrame = 0;
         playPause = 1;
