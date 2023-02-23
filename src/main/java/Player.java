@@ -111,9 +111,12 @@ public class Player {
     };
 
     private final ActionListener buttonListenerRemove = e -> {
-        int index = window.getIdx();
-        playlist.remove(index);
-        musics = removeMusic(musics, index);
+        int idx = window.getIdx();
+        if(idx == index && isplaying) stopMusic(playthread, bitstream, device, window, isplaying);
+
+        if(idx < index) index--; // diminui o index da música tocando se uma música antes dela for removida
+        playlist.remove(idx);
+        musics = removeMusic(musics, idx);
         this.window.setQueueList(musics);
     };
 
@@ -144,20 +147,7 @@ public class Player {
     private final ActionListener buttonListenerStop = e -> {
         // caso esteja tocando alguma musica
         if (isplaying) {
-            playthread.stop();
-
-            try {
-                bitstream.close();
-                device.close();
-            } catch (BitstreamException ex) {
-                throw new RuntimeException(ex);
-            }
-
-            window.setPlayPauseButtonIcon(0);
-            window.setEnabledPlayPauseButton(false);
-            window.setEnabledStopButton(false);
-            isplaying = false;
-            window.resetMiniPlayer();
+            stopMusic(playthread, bitstream, device, window, isplaying);
         }
     };
 
@@ -248,5 +238,24 @@ public class Player {
         System.arraycopy(list, idx + 1, newList, idx, list.length - idx - 1);
         return newList;
     }
+
+    private static void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+        t.stop();
+
+        try {
+            b.close();
+            d.close();
+        } catch (BitstreamException ex) {
+            throw new RuntimeException(ex);
+        }
+
+        w.setPlayPauseButtonIcon(0);
+        w.setEnabledPlayPauseButton(false);
+        w.setEnabledStopButton(false);
+        playing = false;
+        w.resetMiniPlayer();
+    }
+
+
     //</editor-fold>
 }
