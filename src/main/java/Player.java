@@ -45,11 +45,13 @@ public class Player {
     private int index;
     private Song curr_song;
     private Thread playthread;
+    private boolean isplaying = false;
 
     private final ActionListener buttonListenerPlayNow = e -> {
         // setando o frame para o começo da musica
         currentFrame = 0;
         playPause = 1;
+        isplaying = true;
 
         // selecionando a musica
         index = window.getIdx();
@@ -81,6 +83,9 @@ public class Player {
 
                         // resetar o minplayer quando a musica acabar
                         if (!playNextFrame()) {
+                            bitstream.close();
+                            device.close();
+                            isplaying = false;
                             window.resetMiniPlayer();
                             break;
                         }
@@ -126,7 +131,23 @@ public class Player {
     };
 
     private final ActionListener buttonListenerStop = e -> {
+        // caso esteja tocando alguma musica
+        if (isplaying) {
+            playthread.stop();
 
+            try {
+                bitstream.close();
+                device.close();
+            } catch (BitstreamException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            window.setPlayPauseButtonIcon(0);
+            window.setEnabledPlayPauseButton(false);
+            window.setEnabledStopButton(false);
+            isplaying = false;
+            window.resetMiniPlayer();
+        }
     };
 
     private final ActionListener buttonListenerNext = e -> {};
