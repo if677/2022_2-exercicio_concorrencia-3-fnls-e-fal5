@@ -50,8 +50,8 @@ public class Player {
         if (bitstream != null) {
             playThread.interrupt();
 
-            boolean naointerrompido = true;
-            while(naointerrompido) {
+            boolean naoInterrompido = true;
+            while(naoInterrompido) {
                 if (playThread.isInterrupted()) {
                     try {
                         bitstream.close();
@@ -60,7 +60,7 @@ public class Player {
                         throw new RuntimeException(ex);
                     }
 
-                    naointerrompido = false;
+                    naoInterrompido = false;
                 }
             }
         }
