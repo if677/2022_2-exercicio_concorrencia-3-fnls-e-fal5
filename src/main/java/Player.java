@@ -48,12 +48,20 @@ public class Player {
     private final ActionListener buttonListenerPlayNow = e -> {
         // caso tenha mudado de musica antes de terminar a musica anterior
         if (bitstream != null) {
-            playThread.stop();
-            try {
-                bitstream.close();
-                device.close();
-            } catch (BitstreamException ex) {
-                throw new RuntimeException(ex);
+            playThread.interrupt();
+
+            boolean naointerrompido = true;
+            while(naointerrompido) {
+                if (playThread.isInterrupted()) {
+                    try {
+                        bitstream.close();
+                        device.close();
+                    } catch (BitstreamException ex) {
+                        throw new RuntimeException(ex);
+                    }
+
+                    naointerrompido = false;
+                }
             }
         }
 
@@ -90,13 +98,13 @@ public class Player {
                         window.setEnabledPlayPauseButton(true);
                         window.setEnabledStopButton(true);
 
-                        // resetar o minplayer e fechar os objetos quando a musica acabar
+                        // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
                             bitstream.close();
                             device.close();
                             isPlaying = false;
                             window.resetMiniPlayer();
-                            playThread.stop();
+                            playThread.interrupt();
                         }
                     } catch (JavaLayerException ex) {
                         throw new RuntimeException(ex);
@@ -254,7 +262,7 @@ public class Player {
     }
 
     private static void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
-        t.stop();
+        t.interrupt();
 
         try {
             b.close();
