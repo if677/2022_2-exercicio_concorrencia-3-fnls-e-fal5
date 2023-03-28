@@ -64,7 +64,9 @@ public class Player {
         // pega o index da música a ser removida
         int idx = window.getIdx();
         // caso ele esteja tocando, para a reprodução e reseta a janela
-        if(idx == index && isPlaying) stopMusic(playThread, bitstream, device, window, isPlaying);
+        if(idx == index && isPlaying){
+            stopMusic(playThread, bitstream, device, window, isPlaying);
+        }
         // diminui o index da música tocando se uma música antes dela for removida
         if(idx < index) index--;
         // remove a música da playlist
@@ -288,6 +290,8 @@ public class Player {
         w.setPlayPauseButtonIcon(0);
         w.setEnabledPlayPauseButton(false);
         w.setEnabledStopButton(false);
+        w.setEnabledPreviousButton(false);
+        w.setEnabledNextButton(false);
         playing = false;
         w.resetMiniPlayer();
     }
@@ -354,11 +358,15 @@ public class Player {
 
                     // resetar o miniplayer e fechar os objetos quando a musica acabar
                     if (!playNextFrame()) {
-                        bitstream.close();
-                        device.close();
-                        isPlaying = false;
-                        window.resetMiniPlayer();
-                        playThread.interrupt();
+                        if(index == playlist.size()-1) {
+                            stopMusic(playThread, bitstream, device, window, isPlaying);
+                        }
+                        else{
+                            playThread.interrupt();
+                            nextMusic = true;
+                            playThread = new Thread(this::playNow);
+                            playThread.start();
+                        }
                     }
                 } catch (JavaLayerException ex) {
                     throw new RuntimeException(ex);
