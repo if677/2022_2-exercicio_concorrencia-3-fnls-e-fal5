@@ -47,6 +47,8 @@ public class Player {
     private int index;
     private Song currSong;
     private Thread playThread;
+    private boolean nextMusic = false;
+    private boolean previousMusic = false;
     private boolean isPlaying = false;
 
     private final ActionListener buttonListenerPlayNow = e -> {
@@ -111,9 +113,19 @@ public class Player {
         }
     };
 
-    private final ActionListener buttonListenerNext = e -> {};
+    private final ActionListener buttonListenerNext = e -> {
+        threadInterrupt(playThread, bitstream, device);
+        nextMusic = true;
+        playThread = new Thread(this::playNow);
+        playThread.start();
+    };
 
-    private final ActionListener buttonListenerPrevious = e -> {};
+    private final ActionListener buttonListenerPrevious = e -> {
+        threadInterrupt(playThread, bitstream, device);
+        previousMusic = true;
+        playThread = new Thread(this::playNow);
+        playThread.start();
+    };
 
     private final ActionListener buttonListenerShuffle = e -> {};
     private final ActionListener buttonListenerLoop = e -> {};
@@ -307,8 +319,13 @@ public class Player {
         isPlaying = true;
 
         // selecionando a musica
-        index = window.getIdx();
+        if(nextMusic) index++;
+        else if(previousMusic) index--;
+        else index = window.getIdx();
         currSong = playlist.get(index);
+        nextMusic = false;
+        previousMusic = false;
+
 
         // inicializar os objetos para reproduzir a musica
         try {
@@ -332,6 +349,8 @@ public class Player {
                     window.setPlayPauseButtonIcon(playPause);
                     window.setEnabledPlayPauseButton(true);
                     window.setEnabledStopButton(true);
+                    window.setEnabledPreviousButton(index != 0);
+                    window.setEnabledNextButton(index != playlist.size()-1);
 
                     // resetar o miniplayer e fechar os objetos quando a musica acabar
                     if (!playNextFrame()) {
@@ -347,6 +366,7 @@ public class Player {
             }
         }
     }
+
 
     //</editor-fold>
 }
