@@ -47,6 +47,8 @@ public class Player {
     private int index;
     private Song currSong;
     private Thread playThread;
+    private Thread updateFrame;
+    private Thread dragThread;
     private boolean nextMusic = false;
     private boolean previousMusic = false;
     private boolean isPlaying = false;
@@ -132,15 +134,17 @@ public class Player {
     private final ActionListener buttonListenerShuffle = e -> {};
     private final ActionListener buttonListenerLoop = e -> {};
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
-        int nextTime;
-        int nextFrame;
+        int nextTime;   // o segundo para o qual irá pular
+        int nextFrame;  // frame correspondente a esse segundo
         @Override
         public void mouseReleased(MouseEvent e) {
-            Thread updateFrame = new Thread(() -> {
+            updateFrame = new Thread(() -> {
                 bitstreamLock.lock();
+                int currentTime = window.getScrubberValue();
+                int nextCurrentFrame = (int) (currentTime / currSong.getMsPerFrame());
 
                 // se o proximo frame for antes do atual, precisa recomecar a musica
-                if (nextFrame < currentFrame) {
+                if (currentTime >= nextTime) {
                     // fechar device e bitstream
                     try {
                         if (bitstream != null) {
@@ -165,7 +169,7 @@ public class Player {
                 }
 
                 try {
-                    skipToFrame(window.getScrubberValue());
+                    skipToFrame(nextCurrentFrame);
                 } catch (BitstreamException ex) {
                     throw new RuntimeException(ex);
                 }
@@ -173,6 +177,7 @@ public class Player {
                 EventQueue.invokeLater(() -> {
                     window.setTime(nextTime, (int) currSong.getMsLength());
                 });
+                playPause = 1;
             });
 
             updateFrame.start();
@@ -180,12 +185,23 @@ public class Player {
 
         @Override
         public void mousePressed(MouseEvent e) {
-            nextTime = window.getScrubberValue();
-            nextFrame = (int) (nextTime/currSong.getMsPerFrame());
+            playPause = 0;  // pausar a musica
+            nextTime = window.getScrubberValue();   // tempo atual do scrubber
         }
 
         @Override
         public void mouseDragged(MouseEvent e) {
+//            playPause = 0;
+//            nextTime = window.getScrubberValue();
+//            nextFrame = (int) (nextTime/currSong.getMsPerFrame());
+//
+////            dragThread = new Thread(() -> {
+////                EventQueue.invokeLater(() -> {
+////                    window.setTime();
+////                });
+////            });
+//
+//            window.setTime(nextTime,(int) currSong.getMsLength());
         }
     };
 
