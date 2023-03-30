@@ -143,17 +143,10 @@ public class Player {
                     stopMusic(playThread, bitstream, device, window, isPlaying);
 
                     // criar novo device e bitstream
-                    try {
-                        device = FactoryRegistry.systemRegistry().createAudioDevice();
-                        device.open(decoder = new Decoder());
-                        bitstream = new Bitstream(currSong.getBufferedInputStream());
-                    } catch (JavaLayerException | FileNotFoundException ex) {
-                        throw new RuntimeException(ex);
-                    }
+                    initializeObjects();
 
                     currentFrame = 0;
                 }
-
 
                 try {
                     skipToFrame(currentTime);
@@ -180,17 +173,7 @@ public class Player {
 
         @Override
         public void mouseDragged(MouseEvent e) {
-//            playPause = 0;
-//            nextTime = window.getScrubberValue();
-//            nextFrame = (int) (nextTime/currSong.getMsPerFrame());
-//
-////            dragThread = new Thread(() -> {
-////                EventQueue.invokeLater(() -> {
-////                    window.setTime();
-////                });
-////            });
-//
-//            window.setTime(nextTime,(int) currSong.getMsLength());
+
         }
     };
 
@@ -287,7 +270,6 @@ public class Player {
         w.setEnabledNextButton(false);
         playing = false;
         w.resetMiniPlayer();
-        lock.unlock();
     }
 
     private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d) {
