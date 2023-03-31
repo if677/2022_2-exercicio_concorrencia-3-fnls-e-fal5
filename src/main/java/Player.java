@@ -67,15 +67,21 @@ public class Player {
         // caso ele esteja tocando, para a reprodução e reseta a janela
         if(idx == index && isPlaying){
             stopMusic(playThread, bitstream, device, window, isPlaying);
+            if (index < playlist.size()-1){
+                playThread = new Thread(this::playNow);
+                playThread.start();
+            }
         }
         // diminui o index da música tocando se uma música antes dela for removida
         if(idx < index) index--;
+        if(index < 0) index = 0;
         // remove a música da playlist
         playlist.remove(idx);
         // remove a música da lista de músicas
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
+
     };
 
     private final ActionListener buttonListenerAddSong = e -> {
@@ -297,6 +303,8 @@ public class Player {
 
         playThread = new Thread(() -> {
             // setando o frame para o começo da música
+            currentFrame = 0;
+
             playPause = 1;
             isPlaying = true;
 
@@ -304,6 +312,7 @@ public class Player {
             if(nextMusic) index++;
             else if(previousMusic) index--;
             else index = window.getIdx();
+            if(index < 0) index = 0;
             currSong = playlist.get(index);
             nextMusic = false;
             previousMusic = false;
