@@ -133,17 +133,19 @@ public class Player {
     private final ActionListener buttonListenerShuffle = e -> {};
     private final ActionListener buttonListenerLoop = e -> {};
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
+        private int previousState;
         @Override
         public void mouseReleased(MouseEvent e) {
             updateFrame = new Thread(() -> {
                 window.setTime((int) (currentTime * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
 
                 // se o proximo frame for antes do atual, precisa recomecar a musica
-                if (currentTime > currentFrame) {
+                if (currentTime < currentFrame) {
                     stopMusic(playThread, bitstream, device, window, isPlaying);
+                    initializeObjects(); // inicializar objetos
 
-                    // criar novo device e bitstream
-                    initializeObjects();
+                    // mostrar as informações no mini player
+                    window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
 
                     currentFrame = 0;
                 }
@@ -154,10 +156,7 @@ public class Player {
                     throw new RuntimeException(ex);
                 }
 
-                System.out.println(currentTime);
-                System.out.println(currentFrame);
-                playPause = 1;
-                //playNow();
+                playPause = previousState;
             });
 
             updateFrame.start();
@@ -165,15 +164,14 @@ public class Player {
 
         @Override
         public void mousePressed(MouseEvent e) {
+            previousState = playPause; // 1 tocando, 0 pausado
             playPause = 0;  // pausar a musica
             currentTime = (int) (window.getScrubberValue() / currSong.getMsPerFrame());
-            System.out.println("getscrubber invocado, current time é " + currentTime);
-            System.out.println("e o currentframe é: " + currentFrame);
         }
 
         @Override
         public void mouseDragged(MouseEvent e) {
-
+            currentTime = (int) (window.getScrubberValue() / currSong.getMsPerFrame());
         }
     };
 
@@ -268,6 +266,7 @@ public class Player {
         w.setEnabledStopButton(false);
         w.setEnabledPreviousButton(false);
         w.setEnabledNextButton(false);
+        w.setEnabledScrubber(false);
         playing = false;
         w.resetMiniPlayer();
     }
@@ -297,7 +296,7 @@ public class Player {
         threadInterrupt(playThread, bitstream, device);
 
         playThread = new Thread(() -> {
-            // setando o frame para o começo da musica
+            // setando o frame para o começo da música
             playPause = 1;
             isPlaying = true;
 
@@ -309,26 +308,25 @@ public class Player {
             nextMusic = false;
             previousMusic = false;
 
-            System.out.println(currentFrame);
-
             // inicializar os objetos para reproduzir a musica
             initializeObjects();
 
             // exibir informações da musica atual
             window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
 
-            System.out.println(currentFrame);
+
             // tocar a musica
             while(true) {
-                if(playPause == 1){
+                if (playPause == 1) {
                     try {
-                        // mostrar o tempo da musica e habilitar os botões
+                        // mostrar o tempo da música e habilitar os botões
                         window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
                         window.setPlayPauseButtonIcon(playPause);
                         window.setEnabledPlayPauseButton(true);
                         window.setEnabledStopButton(true);
                         window.setEnabledPreviousButton(index != 0);
                         window.setEnabledNextButton(index != playlist.size()-1);
+                        window.setEnabledScrubber(true);
 
                         // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
