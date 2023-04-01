@@ -124,6 +124,7 @@ public class Player {
     private final ActionListener buttonListenerNext = e -> {
         threadInterrupt(playThread, bitstream, device);
         nextMusic = true;
+        if(playPause == 0) playPause = 1;
         playThread = new Thread(this::playNow);
         playThread.start();
     };
@@ -131,6 +132,7 @@ public class Player {
     private final ActionListener buttonListenerPrevious = e -> {
         threadInterrupt(playThread, bitstream, device);
         previousMusic = true;
+        if(playPause == 0) playPause = 1;
         playThread = new Thread(this::playNow);
         playThread.start();
     };
