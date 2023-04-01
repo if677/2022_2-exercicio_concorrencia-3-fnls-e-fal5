@@ -55,7 +55,6 @@ public class Player {
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
-        currentFrame = 0;
 
         // iniciar a thread e começar a tocar a musica
         playNow();
@@ -305,7 +304,6 @@ public class Player {
             // setando o frame para o começo da música
             currentFrame = 0;
 
-            playPause = 1;
             isPlaying = true;
 
             // selecionando a musica
@@ -326,33 +324,34 @@ public class Player {
 
             // tocar a musica
             while(true) {
-                if (playPause == 1) {
-                    try {
-                        // mostrar o tempo da música e habilitar os botões
-                        window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
-                        window.setPlayPauseButtonIcon(playPause);
-                        window.setEnabledPlayPauseButton(true);
-                        window.setEnabledStopButton(true);
-                        window.setEnabledPreviousButton(index != 0);
-                        window.setEnabledNextButton(index != playlist.size()-1);
-                        window.setEnabledScrubber(true);
+                try {
+                    // mostrar o tempo da música e habilitar os botões
+                    window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+                    window.setPlayPauseButtonIcon(playPause);
+                    window.setEnabledPlayPauseButton(true);
+                    window.setEnabledStopButton(true);
+                    window.setEnabledPreviousButton(index != 0);
+                    window.setEnabledNextButton(index != playlist.size()-1);
+                    window.setEnabledScrubber(true);
 
-                        // resetar o miniplayer e fechar os objetos quando a musica acabar
+                    // resetar o miniplayer e fechar os objetos quando a musica acabar
+                    if(playPause == 1){
                         if (!playNextFrame()) {
                             if(index == playlist.size()-1) {
                                 stopMusic(playThread, bitstream, device, window, isPlaying);
                             }
                             else{
-                                playThread.interrupt();
+                                threadInterrupt(playThread, bitstream, device);
                                 nextMusic = true;
                                 playThread = new Thread(this::playNow);
                                 playThread.start();
                             }
                         }
-                    } catch (JavaLayerException ex) {
-                        throw new RuntimeException(ex);
                     }
+                } catch (JavaLayerException ex) {
+                    throw new RuntimeException(ex);
                 }
+
             }
 
         });
