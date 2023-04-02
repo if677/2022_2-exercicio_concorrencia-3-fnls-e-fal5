@@ -146,7 +146,6 @@ public class Player {
         public void mouseReleased(MouseEvent e) {
             updateFrame = new Thread(() -> {
                 window.setTime((int) (currentTime * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
-
                 // se o proximo frame for antes do atual, precisa recomecar a musica
                 if (currentTime < currentFrame) {
                     stopMusic(playThread, bitstream, device, window, isPlaying);
@@ -164,6 +163,13 @@ public class Player {
                     throw new RuntimeException(ex);
                 }
 
+                window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+                window.setPlayPauseButtonIcon(playPause);
+                window.setEnabledPlayPauseButton(true);
+                window.setEnabledStopButton(true);
+                window.setEnabledPreviousButton(index != 0);
+                window.setEnabledNextButton(index != playlist.size()-1);
+                window.setEnabledScrubber(true);
                 playPause = previousState;
             });
 
@@ -324,7 +330,6 @@ public class Player {
 
             // exibir informações da musica atual
             window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
-
 
             // tocar a musica
             while(true) {
