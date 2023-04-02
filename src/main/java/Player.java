@@ -55,6 +55,7 @@ public class Player {
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
+        currentFrame = 0;
 
         // iniciar a thread e começar a tocar a musica
         playNow();
@@ -115,7 +116,7 @@ public class Player {
     };
 
     private final ActionListener buttonListenerStop = e -> {
-        // caso esteja tocando alguma musica
+        // caso esteja tocando alguma música
         if (isPlaying) {
             stopMusic(playThread, bitstream, device, window, isPlaying);
         }
@@ -124,7 +125,7 @@ public class Player {
     private final ActionListener buttonListenerNext = e -> {
         threadInterrupt(playThread, bitstream, device);
         nextMusic = true;
-        if(playPause == 0) playPause = 1;
+        if (playPause == 0) playPause = 1;
         playThread = new Thread(this::playNow);
         playThread.start();
     };
@@ -132,7 +133,7 @@ public class Player {
     private final ActionListener buttonListenerPrevious = e -> {
         threadInterrupt(playThread, bitstream, device);
         previousMusic = true;
-        if(playPause == 0) playPause = 1;
+        if (playPause == 0) playPause = 1;
         playThread = new Thread(this::playNow);
         playThread.start();
     };
@@ -206,16 +207,16 @@ public class Player {
      */
     private boolean playNextFrame() throws JavaLayerException {
         // TODO: Is this thread safe?
-            if (device != null) {
-                Header h = bitstream.readFrame();
-                if (h == null) return false;
+        if (device != null) {
+            Header h = bitstream.readFrame();
+            if (h == null) return false;
 
-                SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
-                device.write(output.getBuffer(), 0, output.getBufferLength());
-                bitstream.closeFrame();
-                currentFrame++;
-            }
-            return true;
+            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
+            device.write(output.getBuffer(), 0, output.getBufferLength());
+            bitstream.closeFrame();
+            currentFrame++;
+        }
+        return true;
 
     }
 
@@ -225,11 +226,11 @@ public class Player {
     private boolean skipNextFrame() throws BitstreamException {
         // TODO: Is this thread safe?
 
-            Header h = bitstream.readFrame();
-            if (h == null) return false;
-            bitstream.closeFrame();
-            currentFrame++;
-            return true;
+        Header h = bitstream.readFrame();
+        if (h == null) return false;
+        bitstream.closeFrame();
+        currentFrame++;
+        return true;
     }
 
     /**
@@ -306,6 +307,7 @@ public class Player {
             // setando o frame para o começo da música
             currentFrame = 0;
 
+            playPause = 1;
             isPlaying = true;
 
             // selecionando a musica
@@ -326,34 +328,33 @@ public class Player {
 
             // tocar a musica
             while(true) {
-                try {
-                    // mostrar o tempo da música e habilitar os botões
-                    window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
-                    window.setPlayPauseButtonIcon(playPause);
-                    window.setEnabledPlayPauseButton(true);
-                    window.setEnabledStopButton(true);
-                    window.setEnabledPreviousButton(index != 0);
-                    window.setEnabledNextButton(index != playlist.size()-1);
-                    window.setEnabledScrubber(true);
+                if (playPause == 1) {
+                    try {
+                        // mostrar o tempo da música e habilitar os botões
+                        window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+                        window.setPlayPauseButtonIcon(playPause);
+                        window.setEnabledPlayPauseButton(true);
+                        window.setEnabledStopButton(true);
+                        window.setEnabledPreviousButton(index != 0);
+                        window.setEnabledNextButton(index != playlist.size()-1);
+                        window.setEnabledScrubber(true);
 
-                    // resetar o miniplayer e fechar os objetos quando a musica acabar
-                    if(playPause == 1){
+                        // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
                             if(index == playlist.size()-1) {
                                 stopMusic(playThread, bitstream, device, window, isPlaying);
                             }
                             else{
-                                threadInterrupt(playThread, bitstream, device);
+                                playThread.interrupt();
                                 nextMusic = true;
                                 playThread = new Thread(this::playNow);
                                 playThread.start();
                             }
                         }
+                    } catch (JavaLayerException ex) {
+                        throw new RuntimeException(ex);
                     }
-                } catch (JavaLayerException ex) {
-                    throw new RuntimeException(ex);
                 }
-
             }
 
         });
