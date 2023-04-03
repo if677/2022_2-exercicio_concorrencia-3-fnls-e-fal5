@@ -49,8 +49,8 @@ public class Player {
     private Thread playThread;
     private Thread updateFrame;
     private Thread dragThread;
-    private boolean nextMusic = false;
-    private boolean previousMusic = false;
+    private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
+    private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
     private int currentTime;
 
@@ -74,6 +74,7 @@ public class Player {
         }
         // diminui o index da música tocando se uma música antes dela for removida
         if(idx < index) index--;
+        // garante que o index n fique negativo por erro
         if(index < 0) index = 0;
         // remove a música da playlist
         playlist.remove(idx);
@@ -123,17 +124,25 @@ public class Player {
     };
 
     private final ActionListener buttonListenerNext = e -> {
+        // interrompe a execução atual
         threadInterrupt(playThread, bitstream, device);
+        // será exibida a próxima música
         nextMusic = true;
+        // se estiver pausada, a próxima inicia despausada
         if (playPause == 0) playPause = 1;
+        // inicia a próxima música
         playThread = new Thread(this::playNow);
         playThread.start();
     };
 
     private final ActionListener buttonListenerPrevious = e -> {
+        // interrompe a execução atual
         threadInterrupt(playThread, bitstream, device);
+        // será exibida a música anterior
         previousMusic = true;
+        // se estiver pausada, a anterior inicia despausada
         if (playPause == 0) playPause = 1;
+        // inicia a música anterior
         playThread = new Thread(this::playNow);
         playThread.start();
     };
@@ -266,8 +275,10 @@ public class Player {
     }
 
     private void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+        // interrompe a thread
         t.interrupt();
 
+        // fecha o bistream e o device
         try {
             b.close();
             d.close();
@@ -275,6 +286,7 @@ public class Player {
             throw new RuntimeException(ex);
         }
 
+        // reinicia a interface e todos os botões
         w.setPlayPauseButtonIcon(0);
         w.setEnabledPlayPauseButton(false);
         w.setEnabledStopButton(false);
@@ -317,11 +329,12 @@ public class Player {
             isPlaying = true;
 
             // selecionando a musica
-            if(nextMusic) index++;
-            else if(previousMusic) index--;
-            else index = window.getIdx();
-            if(index < 0) index = 0;
+            if(nextMusic) index++; // próxima música
+            else if(previousMusic) index--; // música anterior
+            else index = window.getIdx(); // música selecionada pelo clique do mouse
+            if(index < 0) index = 0; // evita erro no index
             currSong = playlist.get(index);
+            // reseta as variáveis next e previous
             nextMusic = false;
             previousMusic = false;
 
@@ -346,9 +359,11 @@ public class Player {
 
                         // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
+                            // caso seja a última música interrompe a reprodução
                             if(index == playlist.size()-1) {
                                 stopMusic(playThread, bitstream, device, window, isPlaying);
                             }
+                            // caso não seja a última música, toca a próxima(semelhante a função next)
                             else{
                                 playThread.interrupt();
                                 nextMusic = true;
