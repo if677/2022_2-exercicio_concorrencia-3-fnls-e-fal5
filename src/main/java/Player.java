@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
 
@@ -30,11 +31,14 @@ public class Player {
      */
     private AudioDevice device;
 
+    // variavel para fazer o lock da bitstream
+    private ReentrantLock lock = new ReentrantLock();
+
     // variaveis para passar p/ o playerwindow
     private PlayerWindow window;
     private String[][] musics = new String[0][];
 
-    // lista com as musicas a serem tocadas
+    // lista com as músicas a serem tocadas
     private ArrayList<Song> playlist = new ArrayList<Song>();
 
     // variaveis para tocar a musica
@@ -43,92 +47,43 @@ public class Player {
     private int index;
     private Song currSong;
     private Thread playThread;
+    private Thread updateFrame;
+    private Thread dragThread;
+    private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
+    private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
+    private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
-        // caso tenha mudado de musica antes de terminar a musica anterior
-        if (bitstream != null) {
-            playThread.interrupt();
-
-            boolean naoInterrompido = true;
-            while(naoInterrompido) {
-                if (playThread.isInterrupted()) {
-                    try {
-                        bitstream.close();
-                        device.close();
-                    } catch (BitstreamException ex) {
-                        throw new RuntimeException(ex);
-                    }
-
-                    naoInterrompido = false;
-                }
-            }
-        }
-
-        // setando o frame para o começo da musica
+        // setar o frame para o começo
         currentFrame = 0;
-        playPause = 1;
-        isPlaying = true;
-
-        // selecionando a musica
-        index = window.getIdx();
-        currSong = playlist.get(index);
-
-        // inicializar os objetos para reproduzir a musica
-        try {
-            this.device = FactoryRegistry.systemRegistry().createAudioDevice();
-            this.device.open(this.decoder = new Decoder());
-            this.bitstream = new Bitstream(currSong.getBufferedInputStream());
-
-        } catch (JavaLayerException | FileNotFoundException ex) {
-            throw new RuntimeException(ex);
-        }
-
-        // exibir informações da musica atual
-        window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
 
         // iniciar a thread e começar a tocar a musica
-        playThread = new Thread(() -> {
-            while(true) {
-                if(playPause == 1){
-                    try {
-                        // mostrar o tempo da musica e habilitar os botões
-                        window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
-                        window.setPlayPauseButtonIcon(playPause);
-                        window.setEnabledPlayPauseButton(true);
-                        window.setEnabledStopButton(true);
-
-                        // resetar o miniplayer e fechar os objetos quando a musica acabar
-                        if (!playNextFrame()) {
-                            bitstream.close();
-                            device.close();
-                            isPlaying = false;
-                            window.resetMiniPlayer();
-                            playThread.interrupt();
-                        }
-                    } catch (JavaLayerException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            }
-        });
-
-        playThread.start();
+        playNow();
     };
 
     private final ActionListener buttonListenerRemove = e -> {
         // pega o index da música a ser removida
         int idx = window.getIdx();
-        // caso ele esteja tocando, para a reprodução e reseta a janela
-        if(idx == index && isPlaying) stopMusic(playThread, bitstream, device, window, isPlaying);
+        // caso ele esteja em execução, para a reprodução e reseta a janela
+        if(idx == index && isPlaying){
+            stopMusic(playThread, bitstream, device, window, isPlaying);
+            if (index < playlist.size()-1){
+                playThread = new Thread(this::playNow);
+                playThread.start();
+            }
+        }
         // diminui o index da música tocando se uma música antes dela for removida
         if(idx < index) index--;
+        // garante que o index n fique negativo por erro
+        if(index < 0) index = 0;
         // remove a música da playlist
         playlist.remove(idx);
         // remove a música da lista de músicas
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
+
     };
 
     private final ActionListener buttonListenerAddSong = e -> {
@@ -163,27 +118,93 @@ public class Player {
     };
 
     private final ActionListener buttonListenerStop = e -> {
-        // caso esteja tocando alguma musica
+        // caso alguma música esteja em reprodução
         if (isPlaying) {
             stopMusic(playThread, bitstream, device, window, isPlaying);
         }
     };
 
-    private final ActionListener buttonListenerNext = e -> {};
-    private final ActionListener buttonListenerPrevious = e -> {};
+    private final ActionListener buttonListenerNext = e -> {
+        // interrompe a execução atual
+        threadInterrupt(playThread, bitstream, device);
+        // será exibida a próxima música
+        nextMusic = true;
+        // se estiver pausada, a próxima inicia despausada
+        if (playPause == 0) playPause = 1;
+        // inicia a próxima música
+        playThread = new Thread(this::playNow);
+        playThread.start();
+    };
+
+    private final ActionListener buttonListenerPrevious = e -> {
+        // interrompe a execução atual
+        threadInterrupt(playThread, bitstream, device);
+        // será exibida a música anterior
+        previousMusic = true;
+        // se estiver pausada, a anterior inicia despausada
+        if (playPause == 0) playPause = 1;
+        // inicia a música anterior
+        playThread = new Thread(this::playNow);
+        playThread.start();
+    };
+
     private final ActionListener buttonListenerShuffle = e -> {};
     private final ActionListener buttonListenerLoop = e -> {};
+
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
+        private int previousState;
         @Override
         public void mouseReleased(MouseEvent e) {
+            updateFrame = new Thread(() -> {
+                // atualizar a barra de tempo para o tempo correto
+                window.setTime((int) (currentTime * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+
+                // se o proximo frame for antes do atual, precisa recomecar a musica
+                if (currentTime < currentFrame) {
+                    // parar a música atual e reiniciar os objetos
+                    stopMusic(playThread, bitstream, device, window, isPlaying);
+                    initializeObjects();
+
+                    // mostrar as informações no mini player
+                    window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
+
+                    //zerar o frame, para poder skipar para o frame correto
+                    currentFrame = 0;
+                }
+
+                //skipar
+                try {
+                    skipToFrame(currentTime);
+                } catch (BitstreamException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+                // atualizar a interface e voltar para o estado que a música estava (pausada ou tocando)
+                window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+                window.setPlayPauseButtonIcon(playPause);
+                window.setEnabledPlayPauseButton(true);
+                window.setEnabledStopButton(true);
+                window.setEnabledPreviousButton(index != 0);
+                window.setEnabledNextButton(index != playlist.size()-1);
+                window.setEnabledScrubber(true);
+                playPause = previousState;
+            });
+
+            updateFrame.start();
         }
 
         @Override
         public void mousePressed(MouseEvent e) {
+            previousState = playPause; // manter o estado em que estava após skipar os frames
+            playPause = 0;  // pausar a musica
+            // pegar o frame para o qual deve-se pular
+            currentTime = (int) (window.getScrubberValue() / currSong.getMsPerFrame());
         }
 
         @Override
         public void mouseDragged(MouseEvent e) {
+            // pegar o frame para o qual deve-se pular
+            currentTime = (int) (window.getScrubberValue() / currSong.getMsPerFrame());
         }
     };
 
@@ -221,6 +242,7 @@ public class Player {
             currentFrame++;
         }
         return true;
+
     }
 
     /**
@@ -228,6 +250,7 @@ public class Player {
      */
     private boolean skipNextFrame() throws BitstreamException {
         // TODO: Is this thread safe?
+
         Header h = bitstream.readFrame();
         if (h == null) return false;
         bitstream.closeFrame();
@@ -261,9 +284,11 @@ public class Player {
         return newList;
     }
 
-    private static void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+    private void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+        // interrompe a thread
         t.interrupt();
 
+        // fecha o bistream e o device
         try {
             b.close();
             d.close();
@@ -271,13 +296,113 @@ public class Player {
             throw new RuntimeException(ex);
         }
 
+        // reinicia a 'interface' e todos os botões
         w.setPlayPauseButtonIcon(0);
         w.setEnabledPlayPauseButton(false);
         w.setEnabledStopButton(false);
+        w.setEnabledPreviousButton(false);
+        w.setEnabledNextButton(false);
+        w.setEnabledScrubber(false);
         playing = false;
         w.resetMiniPlayer();
     }
 
+    private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d) {
+        if (b != null) {
+            t.interrupt();
 
+            // garantir que a thread foi interrompida e então fechar os objetos
+            boolean naoInterrompido = true;
+            while(naoInterrompido) {
+                if (t.isInterrupted()) {
+                    try {
+                        b.close();
+                        d.close();
+                    } catch (BitstreamException ex) {
+                        throw new RuntimeException(ex);
+                    }
+
+                    naoInterrompido = false;
+                }
+            }
+        }
+    }
+
+    private void playNow() {
+        // caso alguma música ainda esteja em execução na thread
+        threadInterrupt(playThread, bitstream, device);
+
+        playThread = new Thread(() -> {
+            // setando o frame para o começo da música
+            currentFrame = 0;
+
+            // setar para a música começar no estado de play (ao invés de pause)
+            playPause = 1;
+            isPlaying = true;
+
+            // selecionando a musica
+            if(nextMusic) index++; // próxima música
+            else if(previousMusic) index--; // música anterior
+            else index = window.getIdx(); // música selecionada pelo clique do mouse
+            if(index < 0) index = 0; // evita erro no index
+            currSong = playlist.get(index);
+            // reseta as variáveis next e previous
+            nextMusic = false;
+            previousMusic = false;
+
+            // inicializar os objetos para reproduzir a música
+            initializeObjects();
+
+            // exibir informações da música atual
+            window.setPlayingSongInfo(currSong.getTitle(), currSong.getAlbum(), currSong.getArtist());
+
+            // tocar a musica
+            while(true) {
+                if (playPause == 1) {
+                    try {
+                        // mostrar o tempo da música e habilitar os botões
+                        window.setTime((currentFrame * (int) currSong.getMsPerFrame()), (int) currSong.getMsLength());
+                        window.setPlayPauseButtonIcon(playPause);
+                        window.setEnabledPlayPauseButton(true);
+                        window.setEnabledStopButton(true);
+                        window.setEnabledPreviousButton(index != 0);
+                        window.setEnabledNextButton(index != playlist.size()-1);
+                        window.setEnabledScrubber(true);
+
+                        // resetar o miniplayer e fechar os objetos quando a musica acabar
+                        if (!playNextFrame()) {
+                            // caso seja a última música interrompe a reprodução
+                            if(index == playlist.size()-1) {
+                                stopMusic(playThread, bitstream, device, window, isPlaying);
+                            }
+                            // caso não seja a última música, toca a próxima(semelhante à função next)
+                            else{
+                                playThread.interrupt();
+                                nextMusic = true;
+                                playThread = new Thread(this::playNow);
+                                playThread.start();
+                            }
+                        }
+                    } catch (JavaLayerException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+
+        });
+
+        playThread.start();
+    }
+
+    private void initializeObjects() {
+        // inicializar os objetos, como descrito na especificação
+        try {
+            device = FactoryRegistry.systemRegistry().createAudioDevice();
+            device.open(decoder = new Decoder());
+            bitstream = new Bitstream(currSong.getBufferedInputStream());
+        } catch (JavaLayerException | FileNotFoundException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
     //</editor-fold>
 }
