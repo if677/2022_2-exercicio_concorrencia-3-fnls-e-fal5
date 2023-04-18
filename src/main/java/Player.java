@@ -52,6 +52,7 @@ public class Player {
     private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
     private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
+    private boolean loopQueue = false;
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
@@ -72,6 +73,10 @@ public class Player {
                 playThread = new Thread(this::playNow);
                 playThread.start();
             }
+            if(index == playlist.size()-1 && loopQueue){
+                playThread = new Thread(this::playNow);
+                playThread.start();
+            }
         }
         // diminui o index da música tocando se uma música antes dela for removida
         if(idx < index) index--;
@@ -83,6 +88,7 @@ public class Player {
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
+        if(playlist.size() == 0) window.setEnabledLoopButton(false);
 
     };
 
@@ -102,6 +108,7 @@ public class Player {
             musics[size] = musicInfo;
             // atualiza a fila
             this.window.setQueueList(musics);
+            if(playlist.size() > 0) window.setEnabledLoopButton(true);
         }
         catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
             throw new RuntimeException(ex);
@@ -149,7 +156,9 @@ public class Player {
     };
 
     private final ActionListener buttonListenerShuffle = e -> {};
-    private final ActionListener buttonListenerLoop = e -> {};
+    private final ActionListener buttonListenerLoop = e -> {
+        loopQueue = !loopQueue;
+    };
 
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         private int previousState;
@@ -341,10 +350,12 @@ public class Player {
             isPlaying = true;
 
             // selecionando a musica
-            if(nextMusic) index++; // próxima música
+            if(index == playlist.size()-1 && loopQueue) index = 0;
+            else if(nextMusic) index++; // próxima música
             else if(previousMusic) index--; // música anterior
             else index = window.getIdx(); // música selecionada pelo clique do mouse
             if(index < 0) index = 0; // evita erro no index
+            System.out.println(index);
             currSong = playlist.get(index);
             // reseta as variáveis next e previous
             nextMusic = false;
@@ -372,7 +383,7 @@ public class Player {
                         // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
                             // caso seja a última música interrompe a reprodução
-                            if(index == playlist.size()-1) {
+                            if(index == playlist.size()-1 && !loopQueue){
                                 stopMusic(playThread, bitstream, device, window, isPlaying);
                             }
                             // caso não seja a última música, toca a próxima(semelhante à função next)
