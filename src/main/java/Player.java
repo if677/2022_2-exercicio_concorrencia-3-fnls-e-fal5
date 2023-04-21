@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
@@ -48,11 +49,12 @@ public class Player {
     private Song currSong;
     private Thread playThread;
     private Thread updateFrame;
-    private Thread dragThread;
     private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
     private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
     private boolean loopQueue = false;
+    boolean isShuffled = false; // variável para dizer se a pl. está em reprodução em modo aleatório
+    private ArrayList<Song> previousPlaylist;
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
@@ -68,7 +70,7 @@ public class Player {
         int idx = window.getIdx();
         // caso ele esteja em execução, para a reprodução e reseta a janela
         if(idx == index && isPlaying){
-            stopMusic(playThread, bitstream, device, window, isPlaying);
+            stopMusic();
             if (index < playlist.size()-1){
                 playThread = new Thread(this::playNow);
                 playThread.start();
@@ -88,6 +90,7 @@ public class Player {
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
+        if(playlist.size() < 2) window.setEnabledShuffleButton(false);
         if(playlist.size() == 0) window.setEnabledLoopButton(false);
 
     };
@@ -109,6 +112,7 @@ public class Player {
             // atualiza a fila
             this.window.setQueueList(musics);
             if(playlist.size() > 0) window.setEnabledLoopButton(true);
+            if(playlist.size() > 1) window.setEnabledShuffleButton(true);
         }
         catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
             throw new RuntimeException(ex);
@@ -127,7 +131,7 @@ public class Player {
     private final ActionListener buttonListenerStop = e -> {
         // caso alguma música esteja em reprodução
         if (isPlaying) {
-            stopMusic(playThread, bitstream, device, window, isPlaying);
+            stopMusic();
         }
     };
 
@@ -155,7 +159,33 @@ public class Player {
         playThread.start();
     };
 
-    private final ActionListener buttonListenerShuffle = e -> {};
+    private final ActionListener buttonListenerShuffle = e -> {
+        // armazenar o estado atual da lista de reprodução
+        if (!isShuffled) {
+            previousPlaylist = playlist;
+        }
+
+        if (isPlaying) { // está em reprodução
+
+
+        } else { // ainda não está em reprodução
+            if (isShuffled) { // já foi embaralhado, deve voltar ao estado inicial
+                playlist = previousPlaylist;
+
+            } else { // ainda nao foi embaralhado
+                shuffle(playlist);
+
+            }
+        }
+
+        isShuffled = !isShuffled;
+        int i = 0;
+        for (Song music: playlist) {
+            musics[i++] = music.getDisplayInfo();
+        }
+        window.setQueueList(musics);    // atualizar interface
+    };
+
     private final ActionListener buttonListenerLoop = e -> {
         loopQueue = !loopQueue;
     };
@@ -171,7 +201,7 @@ public class Player {
                 // se o proximo frame for antes do atual, precisa recomecar a musica
                 if (currentTime < currentFrame) {
                     // parar a música atual e reiniciar os objetos
-                    stopMusic(playThread, bitstream, device, window, isPlaying);
+                    stopMusic();
                     initializeObjects();
 
                     // mostrar as informações no mini player
@@ -293,27 +323,27 @@ public class Player {
         return newList;
     }
 
-    private void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+    private void stopMusic(){
         // interrompe a thread
-        t.interrupt();
+        playThread.interrupt();
 
         // fecha o bistream e o device
         try {
-            b.close();
-            d.close();
+            bitstream.close();
+            device.close();
         } catch (BitstreamException ex) {
             throw new RuntimeException(ex);
         }
 
         // reinicia a 'interface' e todos os botões
-        w.setPlayPauseButtonIcon(0);
-        w.setEnabledPlayPauseButton(false);
-        w.setEnabledStopButton(false);
-        w.setEnabledPreviousButton(false);
-        w.setEnabledNextButton(false);
-        w.setEnabledScrubber(false);
-        playing = false;
-        w.resetMiniPlayer();
+        window.setPlayPauseButtonIcon(0);
+        window.setEnabledPlayPauseButton(false);
+        window.setEnabledStopButton(false);
+        window.setEnabledPreviousButton(false);
+        window.setEnabledNextButton(false);
+        window.setEnabledScrubber(false);
+        isPlaying = false;
+        window.resetMiniPlayer();
     }
 
     private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d) {
@@ -384,7 +414,7 @@ public class Player {
                         if (!playNextFrame()) {
                             // caso seja a última música interrompe a reprodução
                             if(index == playlist.size()-1 && !loopQueue){
-                                stopMusic(playThread, bitstream, device, window, isPlaying);
+                                stopMusic();
                             }
                             // caso não seja a última música, toca a próxima(semelhante à função next)
                             else{
@@ -413,6 +443,27 @@ public class Player {
             bitstream = new Bitstream(currSong.getBufferedInputStream());
         } catch (JavaLayerException | FileNotFoundException ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    static void shuffle(ArrayList<Song> array) {
+        Random rnd = new Random();
+
+        System.out.println("Before shaffling:");
+        for (Song music: array) {
+            System.out.println("music = " + music);
+        }
+
+        for (int i = array.size() - 1; i > 0; i--) {
+            int idx = rnd.nextInt(i+1);
+            Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
+            array.remove(idx);          // remove essa música da playlist
+            array.add(temp);            // insere essa musica no final da pl
+        }
+
+        System.out.println("After shaffling:");
+        for (Song music: array) {
+            System.out.println("music = " + music);
         }
     }
     //</editor-fold>
