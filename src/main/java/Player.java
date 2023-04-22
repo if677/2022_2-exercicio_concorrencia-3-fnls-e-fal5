@@ -12,9 +12,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
@@ -163,22 +161,20 @@ public class Player {
         // armazenar o estado atual da lista de reprodução
         if (!isShuffled) {
             previousPlaylist = new ArrayList<>(playlist);
-        }
 
-        if (isPlaying) { // está em reprodução
+            if (isPlaying) {
+                Collections.swap(playlist, index, 0);
+                shuffle(playlist, isPlaying);
 
-
-        } else { // ainda não está em reprodução
-            if (isShuffled) { // já foi embaralhado, deve voltar ao estado inicial
-                playlist = previousPlaylist;
-
-            } else { // ainda nao foi embaralhado
-                shuffle(playlist);
-
+            } else {
+                shuffle(playlist, isPlaying);
             }
+        } else {
+            playlist = previousPlaylist;
         }
 
         isShuffled = !isShuffled;
+
         int i = 0;
         for (Song music: playlist) {
             musics[i++] = music.getDisplayInfo();
@@ -446,14 +442,24 @@ public class Player {
         }
     }
 
-    static void shuffle(ArrayList<Song> array) {
+    static void shuffle(ArrayList<Song> array, boolean isPlaying) {
         Random rnd = new Random();
 
-        for (int i = array.size() - 1; i > 0; i--) {
-            int idx = rnd.nextInt(i+1);
-            Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
-            array.remove(idx);          // remove essa música da playlist
-            array.add(temp);            // insere essa musica no final da pl
+        if (isPlaying) {
+            for (int i = array.size() - 1; i > 1; i--) {
+                int idx = rnd.nextInt(1,i+1);
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
+                array.remove(idx);          // remove essa música da playlist
+                array.add(temp);            // insere essa musica no final da pl
+            }
+
+        } else {
+            for (int i = array.size() - 1; i > 0; i--) {
+                int idx = rnd.nextInt(i+1);
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
+                array.remove(idx);          // remove essa música da playlist
+                array.add(temp);            // insere essa musica no final da pl
+            }
         }
     }
     //</editor-fold>
