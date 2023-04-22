@@ -162,7 +162,7 @@ public class Player {
     private final ActionListener buttonListenerShuffle = e -> {
         // armazenar o estado atual da lista de reprodução
         if (!isShuffled) {
-            previousPlaylist = playlist;
+            previousPlaylist = new ArrayList<>(playlist);
         }
 
         if (isPlaying) { // está em reprodução
@@ -449,21 +449,11 @@ public class Player {
     static void shuffle(ArrayList<Song> array) {
         Random rnd = new Random();
 
-        System.out.println("Before shaffling:");
-        for (Song music: array) {
-            System.out.println("music = " + music);
-        }
-
         for (int i = array.size() - 1; i > 0; i--) {
             int idx = rnd.nextInt(i+1);
             Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
             array.remove(idx);          // remove essa música da playlist
             array.add(temp);            // insere essa musica no final da pl
-        }
-
-        System.out.println("After shaffling:");
-        for (Song music: array) {
-            System.out.println("music = " + music);
         }
     }
     //</editor-fold>
