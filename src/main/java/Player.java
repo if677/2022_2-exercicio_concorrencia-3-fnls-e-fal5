@@ -138,7 +138,7 @@ public class Player {
 
     private final ActionListener buttonListenerNext = e -> {
         // interrompe a execução atual
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
         // será exibida a próxima música
         nextMusic = true;
         // se estiver pausada, a próxima inicia despausada
@@ -150,7 +150,7 @@ public class Player {
 
     private final ActionListener buttonListenerPrevious = e -> {
         // interrompe a execução atual
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
         // será exibida a música anterior
         previousMusic = true;
         // se estiver pausada, a anterior inicia despausada
@@ -270,16 +270,22 @@ public class Player {
      */
     private boolean playNextFrame() throws JavaLayerException {
         // TODO: Is this thread safe?
-        if (device != null) {
-            Header h = bitstream.readFrame();
-            if (h == null) return false;
+        lock.lock();
+        try {
+            if (device != null) {
+                Header h = bitstream.readFrame();
+                if (h == null) return false;
 
-            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
-            device.write(output.getBuffer(), 0, output.getBufferLength());
-            bitstream.closeFrame();
-            currentFrame++;
+                SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
+                device.write(output.getBuffer(), 0, output.getBufferLength());
+                bitstream.closeFrame();
+                currentFrame++;
+            }
+            return true;
+        } finally {
+            lock.unlock();
         }
-        return true;
+
 
     }
 
@@ -288,12 +294,17 @@ public class Player {
      */
     private boolean skipNextFrame() throws BitstreamException {
         // TODO: Is this thread safe?
+        lock.lock();
+        try {
+            Header h = bitstream.readFrame();
+            if (h == null) return false;
+            bitstream.closeFrame();
+            currentFrame++;
+            return true;
+        } finally {
+            lock.unlock();
+        }
 
-        Header h = bitstream.readFrame();
-        if (h == null) return false;
-        bitstream.closeFrame();
-        currentFrame++;
-        return true;
     }
 
     /**
@@ -304,10 +315,15 @@ public class Player {
      */
     private void skipToFrame(int newFrame) throws BitstreamException {
         // TODO: Is this thread safe?
-        if (newFrame > currentFrame) {
-            int framesToSkip = newFrame - currentFrame;
-            boolean condition = true;
-            while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+        lock.lock();
+        try {
+            if (newFrame > currentFrame) {
+                int framesToSkip = newFrame - currentFrame;
+                boolean condition = true;
+                while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -327,12 +343,14 @@ public class Player {
         playThread.interrupt();
 
         // fecha o bistream e o device
+        lock.lock();
         try {
             bitstream.close();
             device.close();
         } catch (BitstreamException ex) {
             throw new RuntimeException(ex);
         }
+        lock.unlock();
 
         // reinicia a 'interface' e todos os botões
         window.setPlayPauseButtonIcon(0);
@@ -345,7 +363,9 @@ public class Player {
         window.resetMiniPlayer();
     }
 
-    private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d) {
+    private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d, ReentrantLock lock) {
+
+        lock.lock();
         if (b != null) {
             t.interrupt();
 
@@ -364,11 +384,12 @@ public class Player {
                 }
             }
         }
+        lock.unlock();
     }
 
     private void playNow() {
         // caso alguma música ainda esteja em execução na thread
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
 
         playThread = new Thread(() -> {
             // setando o frame para o começo da música
