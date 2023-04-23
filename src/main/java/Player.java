@@ -83,6 +83,9 @@ public class Player {
         // garante que o index n fique negativo por erro
         if(index < 0) index = 0;
         // remove a música da playlist
+        if (isShuffled) { // caso esteja shuffled, também é necessário remover da pl antiga
+            previousPlaylist.remove(playlist.get(idx));
+        }
         playlist.remove(idx);
         // remove a música da lista de músicas
         musics = removeMusic(musics, idx);
@@ -170,7 +173,7 @@ public class Player {
                 shuffle(playlist, isPlaying);
             }
         } else {
-            playlist = previousPlaylist;
+            restore(playlist, previousPlaylist);
         }
 
         isShuffled = !isShuffled;
@@ -460,6 +463,13 @@ public class Player {
                 array.remove(idx);          // remove essa música da playlist
                 array.add(temp);            // insere essa musica no final da pl
             }
+        }
+    }
+
+    static void restore(ArrayList<Song> updatingArray, ArrayList<Song> baseArray) {
+        for (int i = 0; i < baseArray.size(); i++) {
+            updatingArray.remove(i);
+            updatingArray.add(i, baseArray.get(i));
         }
     }
     //</editor-fold>
