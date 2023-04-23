@@ -50,7 +50,7 @@ public class Player {
     private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
     private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
-    private boolean loopQueue = false;
+    private boolean loopQueue = false; // variável que define se a fila está em loop
     boolean isShuffled = false; // variável para dizer se a pl. está em reprodução em modo aleatório
     private ArrayList<Song> previousPlaylist;
     private int currentTime;
@@ -73,7 +73,7 @@ public class Player {
                 playThread = new Thread(this::playNow);
                 playThread.start();
             }
-            if(index == playlist.size()-1 && loopQueue){
+            if(index == playlist.size()-1 && loopQueue){ // caso a fila esteja em loop e a última música seja removida, inicia a reprodução do começo da fila
                 playThread = new Thread(this::playNow);
                 playThread.start();
             }
@@ -91,8 +91,8 @@ public class Player {
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
-        if(playlist.size() < 2) window.setEnabledShuffleButton(false);
-        if(playlist.size() == 0) window.setEnabledLoopButton(false);
+        if(playlist.size() < 2) window.setEnabledShuffleButton(false); // desabilita o shuffle caso restem menos de 2 músicas
+        if(playlist.size() == 0) window.setEnabledLoopButton(false); // desabilita o loop caso não reste nenhuma música
 
     };
 
@@ -112,8 +112,8 @@ public class Player {
             musics[size] = musicInfo;
             // atualiza a fila
             this.window.setQueueList(musics);
-            if(playlist.size() > 0) window.setEnabledLoopButton(true);
-            if(playlist.size() > 1) window.setEnabledShuffleButton(true);
+            if(playlist.size() > 0) window.setEnabledLoopButton(true); // habilita o botão de loop
+            if(playlist.size() > 1) window.setEnabledShuffleButton(true); // habilita o botão de shuffle
         }
         catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
             throw new RuntimeException(ex);
@@ -186,6 +186,7 @@ public class Player {
     };
 
     private final ActionListener buttonListenerLoop = e -> {
+        // inverte o valor da variável que indica se a fila está em loop
         loopQueue = !loopQueue;
     };
 
@@ -396,20 +397,20 @@ public class Player {
             currentFrame = 0;
 
             // setar para a música começar no estado de play (ao invés de pause)
+            lock.lock();
             playPause = 1;
             isPlaying = true;
-
             // selecionando a musica
-            if(index == playlist.size()-1 && loopQueue) index = 0;
+            if(index == playlist.size()-1 && loopQueue) index = 0; // caso o loop esteja ativo, retorna a primeira música
             else if(nextMusic) index++; // próxima música
             else if(previousMusic) index--; // música anterior
             else index = window.getIdx(); // música selecionada pelo clique do mouse
             if(index < 0) index = 0; // evita erro no index
-            System.out.println(index);
             currSong = playlist.get(index);
             // reseta as variáveis next e previous
             nextMusic = false;
             previousMusic = false;
+            lock.unlock();
 
             // inicializar os objetos para reproduzir a música
             initializeObjects();
@@ -434,7 +435,7 @@ public class Player {
                         if (!playNextFrame()) {
                             // caso seja a última música interrompe a reprodução
                             if(index == playlist.size()-1 && !loopQueue){
-                                stopMusic();
+                                stopMusic(); // se o loop não estiver ativo para a reprodução
                             }
                             // caso não seja a última música, toca a próxima(semelhante à função next)
                             else{
