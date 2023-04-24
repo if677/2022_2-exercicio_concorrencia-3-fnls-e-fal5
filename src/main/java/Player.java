@@ -52,7 +52,7 @@ public class Player {
     private boolean isPlaying = false;
     private boolean loopQueue = false; // variável que define se a fila está em loop
     boolean isShuffled = false; // variável para dizer se a pl. está em reprodução em modo aleatório
-    private ArrayList<Song> previousPlaylist;
+    private ArrayList<Song> previousPlaylist; // variável para guardar a playlist antes de ser shuffled
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
@@ -161,28 +161,33 @@ public class Player {
     };
 
     private final ActionListener buttonListenerShuffle = e -> {
-        // armazenar o estado atual da lista de reprodução
+        // caso nao esteja shuffled, armazena o estado atual da lista de reprodução
         if (!isShuffled) {
             previousPlaylist = new ArrayList<>(playlist);
 
+            // caso esteja tocando, botar a musica atual no index 0 e fazer o shuffle das musicas 1 ate size-1
             if (isPlaying) {
                 Collections.swap(playlist, index, 0);
                 shuffle(playlist, isPlaying);
 
+                // caso nao esteja tocando, faz shuffle de todas as musicas
             } else {
                 shuffle(playlist, isPlaying);
             }
         } else {
+            // retorna a playlist para a playlist antiga
             restore(playlist, previousPlaylist);
         }
 
+        // atualiza o estado de shuffle
         isShuffled = !isShuffled;
 
+        // atualizar interface
         int i = 0;
         for (Song music: playlist) {
             musics[i++] = music.getDisplayInfo();
         }
-        window.setQueueList(musics);    // atualizar interface
+        window.setQueueList(musics);
     };
 
     private final ActionListener buttonListenerLoop = e -> {
@@ -458,6 +463,7 @@ public class Player {
 
     private void initializeObjects() {
         // inicializar os objetos, como descrito na especificação
+        lock.lock();
         try {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
             device.open(decoder = new Decoder());
@@ -465,6 +471,7 @@ public class Player {
         } catch (JavaLayerException | FileNotFoundException ex) {
             throw new RuntimeException(ex);
         }
+        lock.unlock();
     }
 
     static void shuffle(ArrayList<Song> array, boolean isPlaying) {
@@ -473,7 +480,7 @@ public class Player {
         if (isPlaying) {
             for (int i = array.size() - 1; i > 1; i--) {
                 int idx = rnd.nextInt(1,i+1);
-                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 1 e i e salva em temp
                 array.remove(idx);          // remove essa música da playlist
                 array.add(temp);            // insere essa musica no final da pl
             }
@@ -481,7 +488,7 @@ public class Player {
         } else {
             for (int i = array.size() - 1; i > 0; i--) {
                 int idx = rnd.nextInt(i+1);
-                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e size-i e salva em temp
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e i e salva em temp
                 array.remove(idx);          // remove essa música da playlist
                 array.add(temp);            // insere essa musica no final da pl
             }
@@ -489,9 +496,10 @@ public class Player {
     }
 
     static void restore(ArrayList<Song> updatingArray, ArrayList<Song> baseArray) {
+        // faz o swap das musicas
         for (int i = 0; i < baseArray.size(); i++) {
-            updatingArray.remove(i);
-            updatingArray.add(i, baseArray.get(i));
+            updatingArray.remove(i); // remove a musica no index i
+            updatingArray.add(i, baseArray.get(i)); // adiciona a musica da pl antiga em i
         }
     }
     //</editor-fold>
