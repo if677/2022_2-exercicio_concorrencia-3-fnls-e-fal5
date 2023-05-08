@@ -12,8 +12,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
@@ -48,10 +47,12 @@ public class Player {
     private Song currSong;
     private Thread playThread;
     private Thread updateFrame;
-    private Thread dragThread;
     private boolean nextMusic = false; // variável para controlar que será exibida a próxima música
     private boolean previousMusic = false; // variável para controlar que será exibida a música anterior
     private boolean isPlaying = false;
+    private boolean loopQueue = false; // variável que define se a fila está em loop
+    boolean isShuffled = false; // variável para dizer se a pl. está em reprodução em modo aleatório
+    private ArrayList<Song> previousPlaylist; // variável para guardar a playlist antes de ser shuffled
     private int currentTime;
 
     private final ActionListener buttonListenerPlayNow = e -> {
@@ -67,8 +68,12 @@ public class Player {
         int idx = window.getIdx();
         // caso ele esteja em execução, para a reprodução e reseta a janela
         if(idx == index && isPlaying){
-            stopMusic(playThread, bitstream, device, window, isPlaying);
+            stopMusic();
             if (index < playlist.size()-1){
+                playThread = new Thread(this::playNow);
+                playThread.start();
+            }
+            if(index == playlist.size()-1 && loopQueue){ // caso a fila esteja em loop e a última música seja removida, inicia a reprodução do começo da fila
                 playThread = new Thread(this::playNow);
                 playThread.start();
             }
@@ -78,11 +83,16 @@ public class Player {
         // garante que o index n fique negativo por erro
         if(index < 0) index = 0;
         // remove a música da playlist
+        if (isShuffled) { // caso esteja shuffled, também é necessário remover da pl antiga
+            previousPlaylist.remove(playlist.get(idx));
+        }
         playlist.remove(idx);
         // remove a música da lista de músicas
         musics = removeMusic(musics, idx);
         // atualiza a fila
         this.window.setQueueList(musics);
+        if(playlist.size() < 2) window.setEnabledShuffleButton(false); // desabilita o shuffle caso restem menos de 2 músicas
+        if(playlist.size() == 0) window.setEnabledLoopButton(false); // desabilita o loop caso não reste nenhuma música
 
     };
 
@@ -102,6 +112,8 @@ public class Player {
             musics[size] = musicInfo;
             // atualiza a fila
             this.window.setQueueList(musics);
+            if(playlist.size() > 0) window.setEnabledLoopButton(true); // habilita o botão de loop
+            if(playlist.size() > 1) window.setEnabledShuffleButton(true); // habilita o botão de shuffle
         }
         catch(IOException | BitstreamException | UnsupportedTagException | InvalidDataException ex) {
             throw new RuntimeException(ex);
@@ -120,13 +132,13 @@ public class Player {
     private final ActionListener buttonListenerStop = e -> {
         // caso alguma música esteja em reprodução
         if (isPlaying) {
-            stopMusic(playThread, bitstream, device, window, isPlaying);
+            stopMusic();
         }
     };
 
     private final ActionListener buttonListenerNext = e -> {
         // interrompe a execução atual
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
         // será exibida a próxima música
         nextMusic = true;
         // se estiver pausada, a próxima inicia despausada
@@ -138,7 +150,7 @@ public class Player {
 
     private final ActionListener buttonListenerPrevious = e -> {
         // interrompe a execução atual
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
         // será exibida a música anterior
         previousMusic = true;
         // se estiver pausada, a anterior inicia despausada
@@ -148,8 +160,40 @@ public class Player {
         playThread.start();
     };
 
-    private final ActionListener buttonListenerShuffle = e -> {};
-    private final ActionListener buttonListenerLoop = e -> {};
+    private final ActionListener buttonListenerShuffle = e -> {
+        // caso nao esteja shuffled, armazena o estado atual da lista de reprodução
+        if (!isShuffled) {
+            previousPlaylist = new ArrayList<>(playlist);
+
+            // caso esteja tocando, botar a musica atual no index 0 e fazer o shuffle das musicas 1 ate size-1
+            if (isPlaying) {
+                Collections.swap(playlist, index, 0);
+                shuffle(playlist, isPlaying);
+
+                // caso nao esteja tocando, faz shuffle de todas as musicas
+            } else {
+                shuffle(playlist, isPlaying);
+            }
+        } else {
+            // retorna a playlist para a playlist antiga
+            restore(playlist, previousPlaylist);
+        }
+
+        // atualiza o estado de shuffle
+        isShuffled = !isShuffled;
+
+        // atualizar interface
+        int i = 0;
+        for (Song music: playlist) {
+            musics[i++] = music.getDisplayInfo();
+        }
+        window.setQueueList(musics);
+    };
+
+    private final ActionListener buttonListenerLoop = e -> {
+        // inverte o valor da variável que indica se a fila está em loop
+        loopQueue = !loopQueue;
+    };
 
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         private int previousState;
@@ -162,7 +206,7 @@ public class Player {
                 // se o proximo frame for antes do atual, precisa recomecar a musica
                 if (currentTime < currentFrame) {
                     // parar a música atual e reiniciar os objetos
-                    stopMusic(playThread, bitstream, device, window, isPlaying);
+                    stopMusic();
                     initializeObjects();
 
                     // mostrar as informações no mini player
@@ -232,16 +276,22 @@ public class Player {
      */
     private boolean playNextFrame() throws JavaLayerException {
         // TODO: Is this thread safe?
-        if (device != null) {
-            Header h = bitstream.readFrame();
-            if (h == null) return false;
+        lock.lock();
+        try {
+            if (device != null) {
+                Header h = bitstream.readFrame();
+                if (h == null) return false;
 
-            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
-            device.write(output.getBuffer(), 0, output.getBufferLength());
-            bitstream.closeFrame();
-            currentFrame++;
+                SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
+                device.write(output.getBuffer(), 0, output.getBufferLength());
+                bitstream.closeFrame();
+                currentFrame++;
+            }
+            return true;
+        } finally {
+            lock.unlock();
         }
-        return true;
+
 
     }
 
@@ -250,12 +300,17 @@ public class Player {
      */
     private boolean skipNextFrame() throws BitstreamException {
         // TODO: Is this thread safe?
+        lock.lock();
+        try {
+            Header h = bitstream.readFrame();
+            if (h == null) return false;
+            bitstream.closeFrame();
+            currentFrame++;
+            return true;
+        } finally {
+            lock.unlock();
+        }
 
-        Header h = bitstream.readFrame();
-        if (h == null) return false;
-        bitstream.closeFrame();
-        currentFrame++;
-        return true;
     }
 
     /**
@@ -266,10 +321,15 @@ public class Player {
      */
     private void skipToFrame(int newFrame) throws BitstreamException {
         // TODO: Is this thread safe?
-        if (newFrame > currentFrame) {
-            int framesToSkip = newFrame - currentFrame;
-            boolean condition = true;
-            while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+        lock.lock();
+        try {
+            if (newFrame > currentFrame) {
+                int framesToSkip = newFrame - currentFrame;
+                boolean condition = true;
+                while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -284,30 +344,34 @@ public class Player {
         return newList;
     }
 
-    private void stopMusic(Thread t, Bitstream b, AudioDevice d, PlayerWindow w, boolean playing){
+    private void stopMusic(){
         // interrompe a thread
-        t.interrupt();
+        playThread.interrupt();
 
         // fecha o bistream e o device
+        lock.lock();
         try {
-            b.close();
-            d.close();
+            bitstream.close();
+            device.close();
         } catch (BitstreamException ex) {
             throw new RuntimeException(ex);
         }
+        lock.unlock();
 
         // reinicia a 'interface' e todos os botões
-        w.setPlayPauseButtonIcon(0);
-        w.setEnabledPlayPauseButton(false);
-        w.setEnabledStopButton(false);
-        w.setEnabledPreviousButton(false);
-        w.setEnabledNextButton(false);
-        w.setEnabledScrubber(false);
-        playing = false;
-        w.resetMiniPlayer();
+        window.setPlayPauseButtonIcon(0);
+        window.setEnabledPlayPauseButton(false);
+        window.setEnabledStopButton(false);
+        window.setEnabledPreviousButton(false);
+        window.setEnabledNextButton(false);
+        window.setEnabledScrubber(false);
+        isPlaying = false;
+        window.resetMiniPlayer();
     }
 
-    private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d) {
+    private static void threadInterrupt(Thread t, Bitstream b, AudioDevice d, ReentrantLock lock) {
+
+        lock.lock();
         if (b != null) {
             t.interrupt();
 
@@ -326,22 +390,24 @@ public class Player {
                 }
             }
         }
+        lock.unlock();
     }
 
     private void playNow() {
         // caso alguma música ainda esteja em execução na thread
-        threadInterrupt(playThread, bitstream, device);
+        threadInterrupt(playThread, bitstream, device, lock);
 
         playThread = new Thread(() -> {
             // setando o frame para o começo da música
             currentFrame = 0;
 
             // setar para a música começar no estado de play (ao invés de pause)
+            lock.lock();
             playPause = 1;
             isPlaying = true;
-
             // selecionando a musica
-            if(nextMusic) index++; // próxima música
+            if(index == playlist.size()-1 && loopQueue) index = 0; // caso o loop esteja ativo, retorna a primeira música
+            else if(nextMusic) index++; // próxima música
             else if(previousMusic) index--; // música anterior
             else index = window.getIdx(); // música selecionada pelo clique do mouse
             if(index < 0) index = 0; // evita erro no index
@@ -349,6 +415,7 @@ public class Player {
             // reseta as variáveis next e previous
             nextMusic = false;
             previousMusic = false;
+            lock.unlock();
 
             // inicializar os objetos para reproduzir a música
             initializeObjects();
@@ -372,8 +439,8 @@ public class Player {
                         // resetar o miniplayer e fechar os objetos quando a musica acabar
                         if (!playNextFrame()) {
                             // caso seja a última música interrompe a reprodução
-                            if(index == playlist.size()-1) {
-                                stopMusic(playThread, bitstream, device, window, isPlaying);
+                            if(index == playlist.size()-1 && !loopQueue){
+                                stopMusic(); // se o loop não estiver ativo para a reprodução
                             }
                             // caso não seja a última música, toca a próxima(semelhante à função next)
                             else{
@@ -396,12 +463,43 @@ public class Player {
 
     private void initializeObjects() {
         // inicializar os objetos, como descrito na especificação
+        lock.lock();
         try {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
             device.open(decoder = new Decoder());
             bitstream = new Bitstream(currSong.getBufferedInputStream());
         } catch (JavaLayerException | FileNotFoundException ex) {
             throw new RuntimeException(ex);
+        }
+        lock.unlock();
+    }
+
+    static void shuffle(ArrayList<Song> array, boolean isPlaying) {
+        Random rnd = new Random();
+
+        if (isPlaying) {
+            for (int i = array.size() - 1; i > 1; i--) {
+                int idx = rnd.nextInt(1,i+1);
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 1 e i e salva em temp
+                array.remove(idx);          // remove essa música da playlist
+                array.add(temp);            // insere essa musica no final da pl
+            }
+
+        } else {
+            for (int i = array.size() - 1; i > 0; i--) {
+                int idx = rnd.nextInt(i+1);
+                Song temp = array.get(idx); // pega uma música aleatoria entre os indexes 0 e i e salva em temp
+                array.remove(idx);          // remove essa música da playlist
+                array.add(temp);            // insere essa musica no final da pl
+            }
+        }
+    }
+
+    static void restore(ArrayList<Song> updatingArray, ArrayList<Song> baseArray) {
+        // faz o swap das musicas
+        for (int i = 0; i < baseArray.size(); i++) {
+            updatingArray.remove(i); // remove a musica no index i
+            updatingArray.add(i, baseArray.get(i)); // adiciona a musica da pl antiga em i
         }
     }
     //</editor-fold>
